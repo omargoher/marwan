@@ -8,6 +8,16 @@ interface CompanySignUpFormProps {
   onSignIn: (user: UserType) => void;
 }
 
+interface ApiError {
+  message?: string;
+  response?: {
+    data?: {
+      message?: string;
+    };
+    status?: number;
+  };
+}
+
 export default function CompanySignUpForm({ onSignIn }: CompanySignUpFormProps) {
   const [formData, setFormData] = useState({
     branchName: '',
@@ -76,23 +86,23 @@ export default function CompanySignUpForm({ onSignIn }: CompanySignUpFormProps) 
       console.log('Company account created:', response.data);
       onSignIn(response.data);
       navigate('/company/dashboard');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating company account:', err);
+      const apiError = err as ApiError;
       console.error('Error details:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        headers: err.response?.headers
+        message: apiError.message,
+        response: apiError.response?.data,
+        status: apiError.response?.status
       });
       
-      if (err.response?.status === 400) {
-        setError(`Invalid data: ${err.response.data?.message || 'Please check your input.'}`);
-      } else if (err.response?.status === 401) {
+      if (apiError.response?.status === 400) {
+        setError(`Invalid data: ${apiError.response.data?.message || 'Please check your input.'}`);
+      } else if (apiError.response?.status === 401) {
         setError('Authentication failed. Please try again.');
-      } else if (err.response?.status === 403) {
+      } else if (apiError.response?.status === 403) {
         setError('You do not have permission to create a company account.');
       } else {
-        setError(err.response?.data?.message || 'Failed to create company account. Please try again.');
+        setError(apiError.response?.data?.message || 'Failed to create company account. Please try again.');
       }
     } finally {
       setLoading(false);

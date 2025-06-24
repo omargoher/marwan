@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { X, Heart, ShoppingCart, AlertCircle } from 'lucide-react';
 import { wishlistApi, drugViewApi } from '../services/api';
-import { Wishlist as WishlistType, DrugResponseDetailsDto } from '../types';
+import { Wishlist as WishlistType, DrugResponseDetailsDto, Product } from '../types';
 
 interface WishlistProps {
   isOpen: boolean;
   onClose: () => void;
-  items: any[];
   onRemove: (productId: string) => void;
-  onAddToCart: (product: any) => void;
+  onAddToCart: (product: Product) => void;
 }
 
 export default function Wishlist({ 
   isOpen, 
   onClose, 
-  items, 
   onRemove, 
   onAddToCart 
 }: WishlistProps) {
@@ -158,7 +156,7 @@ export default function Wishlist({
 interface WishlistItemProps {
   wishlistItem: WishlistType;
   onRemove: (wishlistItem: WishlistType) => void;
-  onAddToCart: (product: any) => void;
+  onAddToCart: (product: Product) => void;
 }
 
 function WishlistItem({ wishlistItem, onRemove, onAddToCart }: WishlistItemProps) {

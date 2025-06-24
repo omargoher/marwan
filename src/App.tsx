@@ -21,7 +21,7 @@ import CompanyDashboard from './pages/Company/Dashboard';
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
 import Wishlist from './components/Wishlist';
-import { CartItem, Product, User, Item } from './types';
+import { CartItem, Product, User } from './types';
 
 function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);

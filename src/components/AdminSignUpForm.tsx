@@ -2,10 +2,17 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Phone, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { User as UserType } from '../types';
-import authAxios from '../services/auth'; // Import the configured axios instance
 
 interface AdminSignUpFormProps {
   onSignIn: (user: UserType) => void;
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
 }
 
 export default function AdminSignUpForm({ onSignIn }: AdminSignUpFormProps) {
@@ -82,9 +89,10 @@ export default function AdminSignUpForm({ onSignIn }: AdminSignUpFormProps) {
       onSignIn(newUser);
       navigate('/admin/dashboard');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Admin registration error:', error);
-      setError(error.response?.data?.message || 'Failed to create admin account. Please try again.');
+      const apiError = error as ApiError;
+      setError(apiError.response?.data?.message || 'Failed to create admin account. Please try again.');
     } finally {
       setLoading(false);
     }

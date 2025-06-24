@@ -2,10 +2,17 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Phone, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { User as UserType } from '../types';
-import authAxios from '../services/auth';
 
 interface CustomerSignUpFormProps {
   onSignIn: (user: UserType) => void;
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
 }
 
 export default function CustomerSignUpForm({ onSignIn }: CustomerSignUpFormProps) {
@@ -81,9 +88,10 @@ export default function CustomerSignUpForm({ onSignIn }: CustomerSignUpFormProps
       onSignIn(newUser);
       navigate('/');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Customer registration error:', error);
-      setError(error.response?.data?.message || 'Failed to create account. Please try again.');
+      const apiError = error as ApiError;
+      setError(apiError.response?.data?.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }

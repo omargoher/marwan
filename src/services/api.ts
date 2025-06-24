@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getStoredToken } from './auth';
+import { getStoredToken, ensureAuthenticated } from './auth';
 import {
   ApiResponse,
   UserDTO,
@@ -12,7 +12,6 @@ import {
   ActiveIngredient,
   Company,
   CompanyDTO,
-  Branch,
   BranchDTO,
   BranchWithEmployeesDTO,
   Item,
@@ -23,11 +22,11 @@ import {
   LogHistory,
   DrugResponseDto,
   DrugResponseDetailsDto,
-  CustomerInfoDTO,
   User
 } from '../types';
 
 const BASE_URL = 'http://localhost:8080/api/';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -51,15 +50,31 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid
+      console.log('API Authentication failed - clearing tokens');
       localStorage.removeItem('token');
       localStorage.removeItem('isAuthenticated');
       localStorage.removeItem('userRole');
       localStorage.removeItem('currentUser');
-      window.location.href = '/signin';
+      
+      // Create a more specific error message
+      const authError = new Error('Authentication failed. Please login again.');
+      authError.name = 'AuthenticationError';
+      return Promise.reject(authError);
     }
     return Promise.reject(error);
   }
 );
+
+// Helper function for authenticated API calls
+const authenticatedApiCall = async <T>(
+  apiCall: () => Promise<T>
+): Promise<T> => {
+  const isAuth = await ensureAuthenticated();
+  if (!isAuth) {
+    throw new Error('Authentication failed. Please login again.');
+  }
+  return apiCall();
+};
 
 // Auth API
 export const authApi = {
@@ -135,18 +150,24 @@ export const drugsApi = {
   },
 
   addDrugToMain: async (drug: Drugs): Promise<ApiResponse<Drugs>> => {
-    const response = await api.post<ApiResponse<Drugs>>('/drugs/add', drug);
-    return response.data;
+    return authenticatedApiCall(async () => {
+      const response = await api.post<ApiResponse<Drugs>>('/drugs/add', drug);
+      return response.data;
+    });
   },
 
   updateDrug: async (id: string, drug: Drugs): Promise<ApiResponse<Drugs>> => {
-    const response = await api.put<ApiResponse<Drugs>>(`/drugs/${id}`, drug);
-    return response.data;
+    return authenticatedApiCall(async () => {
+      const response = await api.put<ApiResponse<Drugs>>(`/drugs/${id}`, drug);
+      return response.data;
+    });
   },
 
   deleteDrug: async (id: string): Promise<ApiResponse<void>> => {
-    const response = await api.delete<ApiResponse<void>>(`/drugs/${id}`);
-    return response.data;
+    return authenticatedApiCall(async () => {
+      const response = await api.delete<ApiResponse<void>>(`/drugs/${id}`);
+      return response.data;
+    });
   }
 };
 
@@ -186,18 +207,24 @@ export const categoriesApi = {
   },
 
   createCategory: async (category: Category): Promise<ApiResponse<Category>> => {
-    const response = await api.post<ApiResponse<Category>>('/category', category);
-    return response.data;
+    return authenticatedApiCall(async () => {
+      const response = await api.post<ApiResponse<Category>>('/category', category);
+      return response.data;
+    });
   },
 
   updateCategory: async (id: string, category: Category): Promise<ApiResponse<Category>> => {
-    const response = await api.put<ApiResponse<Category>>(`/category/${id}`, category);
-    return response.data;
+    return authenticatedApiCall(async () => {
+      const response = await api.put<ApiResponse<Category>>(`/category/${id}`, category);
+      return response.data;
+    });
   },
 
   deleteCategory: async (id: string): Promise<ApiResponse<void>> => {
-    const response = await api.delete<ApiResponse<void>>(`/category/${id}`);
-    return response.data;
+    return authenticatedApiCall(async () => {
+      const response = await api.delete<ApiResponse<void>>(`/category/${id}`);
+      return response.data;
+    });
   }
 };
 
@@ -261,13 +288,13 @@ export const branchApi = {
     return response.data;
   },
   
-  updateBranch: async (id: number, branch: BranchDTO): Promise<ApiResponse<BranchDTO>> => {
-    const response = await api.put<ApiResponse<BranchDTO>>(`/branches/${id}`, branch);
+  updateBranch: async (branchId: number, branch: BranchDTO): Promise<ApiResponse<BranchDTO>> => {
+    const response = await api.put<ApiResponse<BranchDTO>>(`/branches/${branchId}`, branch);
     return response.data;
   },
   
-  deleteBranch: async (id: number): Promise<ApiResponse<BranchDTO>> => {
-    const response = await api.delete<ApiResponse<BranchDTO>>(`/branches/${id}`);
+  deleteBranch: async (branchId: number): Promise<ApiResponse<void>> => {
+    const response = await api.delete<ApiResponse<void>>(`/branches/${branchId}`);
     return response.data;
   },
   
@@ -287,36 +314,159 @@ export const branchApi = {
   }
 };
 
-// Inventory Management API
+// Inventory Management (Company Product CRUD)
 export const inventoryApi = {
-  getAllInventoryDrugs: async (): Promise<ApiResponse<InventoryDrug[]>> => {
-    const response = await api.get<ApiResponse<InventoryDrug[]>>('/inventory-drugs');
-    return response.data;
+  // Get all drugs (main drugs list)
+  getAllDrugs: async (): Promise<Drugs[]> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/drugs`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      return result.data || [];
+    } catch (error) {
+      console.error('Error fetching drugs:', error);
+      throw error;
+    }
   },
-  
-  getInventoryDrugById: async (id: string): Promise<ApiResponse<InventoryDrug>> => {
-    const response = await api.get<ApiResponse<InventoryDrug>>(`/inventory-drugs/${id}`);
-    return response.data;
+
+  // Get all drugs for a specific branch (inventory)
+  getAllDrugsForBranch: async (branchId: number): Promise<InventoryDrug[]> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/inventory-drugs/branch/${branchId}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      return result.data || [];
+    } catch (error) {
+      console.error('Error fetching branch inventory:', error);
+      throw error;
+    }
   },
-  
-  saveInventoryDrug: async (drug: InventoryDrug): Promise<ApiResponse<InventoryDrug>> => {
-    const response = await api.post<ApiResponse<InventoryDrug>>('/inventory-drugs/save', drug);
-    return response.data;
+
+  // Get inventory drug by ID
+  getInventoryDrugById: async (id: string, token: string): Promise<InventoryDrug> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/inventory-drugs/${id}`, {
+        headers: {
+          'token': token
+        }
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error('Error fetching inventory drug:', error);
+      throw error;
+    }
   },
-  
-  updateInventoryDrug: async (id: string, drug: InventoryDrug): Promise<ApiResponse<InventoryDrug>> => {
-    const response = await api.put<ApiResponse<InventoryDrug>>(`/inventory-drugs/update/${id}`, drug);
-    return response.data;
+
+  // Save new inventory drug
+  saveInventoryDrug: async (inventoryDrug: InventoryDrug, token: string): Promise<InventoryDrug> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/inventory-drugs/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'token': token
+        },
+        body: JSON.stringify(inventoryDrug)
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error('Error saving inventory drug:', error);
+      throw error;
+    }
   },
-  
-  deleteInventoryDrug: async (id: string): Promise<ApiResponse<void>> => {
-    const response = await api.delete<ApiResponse<void>>(`/inventory-drugs/delete/${id}`);
-    return response.data;
+
+  // Update inventory drug
+  updateInventoryDrug: async (id: string, inventoryDrug: InventoryDrug, token: string): Promise<InventoryDrug> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/inventory-drugs/update/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'token': token
+        },
+        body: JSON.stringify(inventoryDrug)
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error('Error updating inventory drug:', error);
+      throw error;
+    }
   },
-  
-  getAllDrugsForBranch: async (branchId: number): Promise<ApiResponse<InventoryDrug[]>> => {
-    const response = await api.get<ApiResponse<InventoryDrug[]>>(`/inventory-drugs/branch/${branchId}`);
-    return response.data;
+
+  // Delete inventory drug
+  deleteInventoryDrug: async (id: string, token: string): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/inventory-drugs/delete/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'token': token
+        }
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    } catch (error) {
+      console.error('Error deleting inventory drug:', error);
+      throw error;
+    }
+  },
+
+  // Legacy methods for admin drug management
+  createDrug: async (drug: Drugs, headers: Record<string, string>): Promise<Drugs> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/drugs/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
+        body: JSON.stringify(drug)
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error('Error creating drug:', error);
+      throw error;
+    }
+  },
+
+  updateDrug: async (id: string, drug: Drugs, headers: Record<string, string>): Promise<Drugs> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/drugs/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
+        body: JSON.stringify(drug)
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error('Error updating drug:', error);
+      throw error;
+    }
+  },
+
+  deleteDrug: async (id: string, headers: Record<string, string>): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/drugs/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...headers
+        }
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    } catch (error) {
+      console.error('Error deleting drug:', error);
+      throw error;
+    }
   }
 };
 

@@ -17,7 +17,7 @@ export interface ApiFieldError {
   code: string;
   message: string;
   property: string;
-  rejectedValue: any;
+  rejectedValue: unknown;
   path: string;
 }
 

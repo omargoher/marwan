@@ -53,25 +53,12 @@ export default function Cart({
       setError('');
       const response = await cartApi.removeFromCart(item);
       if (response.status) {
-        setCartData(response.data);
+        // Refresh cart data after removing item
+        await fetchCart();
       }
     } catch (err) {
       console.error('Error removing item from cart:', err);
       setError('Failed to remove item from cart. Please try again.');
-    }
-  };
-
-  const addToCart = async (item: Item) => {
-    try {
-      setError('');
-      const response = await cartApi.addToCart(item);
-      if (response.status) {
-        // Refresh cart data after adding item
-        await fetchCart();
-      }
-    } catch (err) {
-      console.error('Error adding item to cart:', err);
-      setError('Failed to add item to cart. Please try again.');
     }
   };
 

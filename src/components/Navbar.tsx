@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, Search, Heart, X, User, Building2 } from 'lucide-react';
+import { ShoppingCart, Menu, Search, Heart, X, User } from 'lucide-react';
 
 interface NavbarProps {
   cartItemsCount: number;

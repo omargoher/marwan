@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { authApi } from './api';
-import { UserLogin, UserDTO, UserCompanyDTO, ApiResponse } from '../types';
+import { UserDTO, UserCompanyDTO, ApiResponse } from '../types';
 
 const API_URL = 'http://localhost:8080/api/';
 
@@ -29,11 +29,13 @@ authAxios.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid
+      console.log('Authentication failed - redirecting to login');
       localStorage.removeItem('token');
       localStorage.removeItem('isAuthenticated');
       localStorage.removeItem('userRole');
       localStorage.removeItem('currentUser');
-      window.location.href = '/signin';
+      // Don't redirect immediately, let the component handle it
+      return Promise.reject(new Error('Authentication failed. Please login again.'));
     }
     return Promise.reject(error);
   }
@@ -46,12 +48,31 @@ export const authenticate = async (email: string, password: string): Promise<Api
     if (response.status) {
       // Store the token
       localStorage.setItem('token', response.data);
+      localStorage.setItem('isAuthenticated', 'true');
     }
     
     return response;
   } catch (error) {
     console.error('Authentication error:', error);
     throw error;
+  }
+};
+
+export const validateToken = async (): Promise<boolean> => {
+  try {
+    const token = getStoredToken();
+    if (!token) {
+      return false;
+    }
+    
+    // Try to get user details to validate token
+    const response = await authApi.getUserDetails();
+    return response.status;
+  } catch (error) {
+    console.error('Token validation error:', error);
+    // Clear invalid token
+    removeStoredToken();
+    return false;
   }
 };
 
@@ -182,7 +203,24 @@ export const removeStoredToken = (): void => {
 };
 
 export const isAuthenticated = (): boolean => {
-  return !!getStoredToken();
+  const token = getStoredToken();
+  const isAuth = localStorage.getItem('isAuthenticated');
+  return !!(token && isAuth === 'true');
+};
+
+export const ensureAuthenticated = async (): Promise<boolean> => {
+  if (!isAuthenticated()) {
+    return false;
+  }
+  
+  // Validate token with server
+  const isValid = await validateToken();
+  if (!isValid) {
+    removeStoredToken();
+    return false;
+  }
+  
+  return true;
 };
 
 export default authAxios;

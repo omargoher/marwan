@@ -1,6 +1,8 @@
+// NOTE: This Profile page fetches and updates user profile data from the backend, not localStorage.
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, MapPin, Shield, Bell, CreditCard, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { authApi } from '../services/api';
 
 interface ProfileFormData {
   firstName: string;
@@ -31,35 +33,17 @@ export default function Profile() {
   const navigate = useNavigate();
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingHealth, setIsEditingHealth] = useState(false);
-  const [profileData, setProfileData] = useState<ProfileFormData>(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      const user = JSON.parse(savedUser);
-      return {
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        address: user.address || {
-          street: '',
-          city: '',
-          state: '',
-          zipCode: ''
-        }
-      };
+  const [profileData, setProfileData] = useState<ProfileFormData>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: ''
     }
-    return {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      address: {
-        street: '',
-        city: '',
-        state: '',
-        zipCode: ''
-      }
-    };
   });
 
   const [healthData, setHealthData] = useState<HealthFormData>({
@@ -74,15 +58,79 @@ export default function Profile() {
     }
   });
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function fetchProfile() {
+      setLoading(true);
+      setError('');
+      try {
+        const userRes = await authApi.getUserDetails();
+        if (userRes.status) {
+          setProfileData({
+            firstName: userRes.data.firstName || '',
+            lastName: userRes.data.lastName || '',
+            email: userRes.data.email || '',
+            phone: userRes.data.phone || '',
+            address: {
+              street: userRes.data.address || '',
+              city: userRes.data.city || '',
+              state: '',
+              zipCode: ''
+            }
+          });
+        } else {
+          setError('Failed to load profile data.');
+        }
+      } catch (err) {
+        setError('Failed to load profile data.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProfile();
+  }, []);
+
   const handleLogout = () => {
     // TODO: Implement actual logout logic
     navigate('/signin');
   };
 
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Save profile changes to backend
-    setIsEditingProfile(false);
+    setLoading(true);
+    setError('');
+    try {
+      const currentPassword = prompt('Enter your current password to update profile:') || '';
+      const userUpdate = {
+        ...profileData,
+        address: profileData.address.street,
+        city: profileData.address.city
+      };
+      const res = await authApi.updateUserDetails(userUpdate, currentPassword);
+      if (res.status) {
+        setProfileData({
+          firstName: res.data.firstName || '',
+          lastName: res.data.lastName || '',
+          email: res.data.email || '',
+          phone: res.data.phone || '',
+          address: {
+            street: res.data.address || '',
+            city: res.data.city || '',
+            state: '',
+            zipCode: ''
+          }
+        });
+        setIsEditingProfile(false);
+      } else {
+        setError('Failed to update profile.');
+      }
+    } catch (err) {
+      setError('Failed to update profile.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleHealthSubmit = (e: React.FormEvent) => {
@@ -90,6 +138,13 @@ export default function Profile() {
     // TODO: Save health information to backend
     setIsEditingHealth(false);
   };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+  if (error) {
+    return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
+  }
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
